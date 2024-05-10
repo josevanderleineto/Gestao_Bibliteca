@@ -18,47 +18,26 @@ data = {
 
 df = pd.DataFrame(data)
 
-# Sidebar - Filtros
-st.sidebar.title("Filtros")
-selected_month = st.sidebar.selectbox("Selecione o mês:", df["Mês"])
-
-# Filtrar os dados
-filtered_df = df[df["Mês"] == selected_month]
-
-# Exibir os dados filtrados
-st.write("### Dados do mês selecionado:")
-st.write(filtered_df)
+# Exibir os dados
+st.write("### Gasto da Bibliteca:")
+st.write(df)
 
 # Gráficos
 st.write("### Gráficos:")
 
-# Dividindo a tela em duas colunas
-col1, col2 = st.columns(2)
-
 # Gráfico de Barras
-with col1:
-    st.write("#### Despesas por Serviço:")
-    st.bar_chart(filtered_df.set_index("Mês").drop(columns=["Total Mensal (R$)"]))
+st.bar_chart(df.set_index("Mês").drop(columns=["Total Mensal (R$)"]))
 
 # Gráfico de Pizza
-with col2:
-    st.write("#### Total por Serviço:")
-    fig, ax = plt.subplots()
-    ax.pie(filtered_df.iloc[0, 1:5], labels=filtered_df.columns[1:5], autopct='%1.1f%%')
-    st.pyplot(fig)
+st.write("#### Total por Serviço:")
+fig, ax = plt.subplots()
+ax.pie(df.iloc[0:12, 1:5].sum(), labels=df.columns[1:5], autopct='%1.1f%%')
+st.pyplot(fig)
 
 # Gráfico de Linha
-st.write("#### Total Mensal:")
+st.write("#### Total Mensal (Linha):")
 st.line_chart(df.set_index("Mês")["Total Mensal (R$)"])
-
-# Segmentação de dados por datas
-st.write("### Segmentação de Dados por Datas:")
-st.write(df)
 
 # Gráfico de Barras Horizontais Empilhadas para Total Anual por Serviço
 st.write("#### Total Anual por Serviço:")
 st.bar_chart(df.iloc[-1, 1:5])
-
-# Gráfico de Linha para Total Anual
-st.write("#### Total Mensal (Linha):")
-st.line_chart(df.set_index("Mês")["Total Mensal (R$)"])
