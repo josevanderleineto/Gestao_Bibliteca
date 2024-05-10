@@ -79,7 +79,7 @@ total_annual_layout = go.Layout(title="Total Anual por Serviço")
 total_annual_fig = go.Figure(data=[total_annual_trace], layout=total_annual_layout)
 st.plotly_chart(total_annual_fig)
 
-# Gráfico de Linha para Total Anual
+# Gráfico de Linha para Total Anuale
 total_annual_line_trace = go.Scatter(
     x=df["Mês"],
     y=df["Total Mensal (R$)"],
