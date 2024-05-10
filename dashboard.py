@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objs as go
+import matplotlib.pyplot as plt
 
 # Carregar os dados
 data = {
@@ -32,61 +32,33 @@ st.write(filtered_df)
 # Gráficos
 st.write("### Gráficos:")
 
+# Dividindo a tela em duas colunas
+col1, col2 = st.columns(2)
+
 # Gráfico de Barras
-bar_trace = go.Bar(
-    x=filtered_df["Mês"],
-    y=[filtered_df[col] for col in filtered_df.columns[1:5]],
-)
-bar_layout = go.Layout(title="Despesas por Serviço")
-bar_fig = go.Figure(data=[bar_trace], layout=bar_layout)
-st.plotly_chart(bar_fig)
+with col1:
+    st.write("#### Despesas por Serviço:")
+    st.bar_chart(filtered_df.set_index("Mês").drop(columns=["Total Mensal (R$)"]))
 
 # Gráfico de Pizza
-pie_trace = go.Pie(
-    labels=filtered_df.columns[1:5],
-    values=filtered_df.iloc[0, 1:5],
-    hoverinfo='label+percent',
-    textinfo='value',
-    textposition='inside',
-)
-pie_layout = go.Layout(title="Total por Serviço")
-pie_fig = go.Figure(data=[pie_trace], layout=pie_layout)
-st.plotly_chart(pie_fig)
+with col2:
+    st.write("#### Total por Serviço:")
+    fig, ax = plt.subplots()
+    ax.pie(filtered_df.iloc[0, 1:5], labels=filtered_df.columns[1:5], autopct='%1.1f%%')
+    st.pyplot(fig)
 
-# Gráfico de Linhas
-line_trace = go.Scatter(
-    x=df["Mês"],
-    y=df["Total Mensal (R$)"],
-    mode='lines+markers',
-    name='Total Mensal (R$)',
-    marker=dict(color='skyblue')
-)
-line_layout = go.Layout(title="Total Mensal")
-line_fig = go.Figure(data=[line_trace], layout=line_layout)
-st.plotly_chart(line_fig)
+# Gráfico de Linha
+st.write("#### Total Mensal:")
+st.line_chart(df.set_index("Mês")["Total Mensal (R$)"])
 
 # Segmentação de dados por datas
 st.write("### Segmentação de Dados por Datas:")
 st.write(df)
 
 # Gráfico de Barras Horizontais Empilhadas para Total Anual por Serviço
-total_annual_trace = go.Bar(
-    y=df.columns[1:5],
-    x=df.iloc[-1, 1:5],
-    orientation='h',
-)
-total_annual_layout = go.Layout(title="Total Anual por Serviço")
-total_annual_fig = go.Figure(data=[total_annual_trace], layout=total_annual_layout)
-st.plotly_chart(total_annual_fig)
+st.write("#### Total Anual por Serviço:")
+st.bar_chart(df.iloc[-1, 1:5])
 
-# Gráfico de Linha para Total Anuale
-total_annual_line_trace = go.Scatter(
-    x=df["Mês"],
-    y=df["Total Mensal (R$)"],
-    mode='lines',
-    name='Total Mensal (R$)',
-    marker=dict(color='skyblue')
-)
-total_annual_line_layout = go.Layout(title="Total Mensal (Linha)")
-total_annual_line_fig = go.Figure(data=[total_annual_line_trace], layout=total_annual_line_layout)
-st.plotly_chart(total_annual_line_fig)
+# Gráfico de Linha para Total Anual
+st.write("#### Total Mensal (Linha):")
+st.line_chart(df.set_index("Mês")["Total Mensal (R$)"])
