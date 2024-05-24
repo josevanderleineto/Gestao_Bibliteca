@@ -65,9 +65,11 @@ if st.button("Inserir Dados"):
     inserir_dados(mes, ebsco, capes, pergumum, minha_biblioteca, total_mensal)
     st.success("Dados inseridos com sucesso!")
 
-# Exibir os dados
+# Exibir os dados em forma de tabela
+st.write("### Tabela de Dados:")
 df = pd.DataFrame(data, columns=["Mês", "EBSCO (R$)", "CAPES (R$)", "Pergamum (R$)", "Minha Biblioteca (R$)", "Total Mensal (R$)"])
 df.set_index("Mês", inplace=True)
+st.write(df)
 
 # Gráfico de barras
 st.write("### Gastos do SIBI UniFTC:")
