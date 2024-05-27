@@ -1,94 +1,136 @@
 import streamlit as st
 import pandas as pd
 import sqlite3
-import matplotlib.pyplot as plt
-import datetime
+import plotly.express as px
+from datetime import datetime
 
-# Conectar ao banco de dados SQLite ou criá-lo se não existir
-conn = sqlite3.connect('dados_sibi.db')
-cursor = conn.cursor()
-
-# Verificar se a tabela já existe, se não, criar uma nova
-cursor.execute('''CREATE TABLE IF NOT EXISTS gastos (
-                    ano INTEGER,
-                    mes TEXT,
-                    ebsco REAL,
-                    capes REAL,
-                    pergumum REAL,
-                    minha_biblioteca REAL,
-                    total_mensal REAL,
-                    PRIMARY KEY (ano, mes)
-                )''')
-
-# Função para inserir dados no banco de dados
-def inserir_dados(ano, mes, ebsco, capes, pergumum, minha_biblioteca, total_mensal):
-    cursor.execute('''INSERT OR REPLACE INTO gastos (ano, mes, ebsco, capes, pergumum, minha_biblioteca, total_mensal)
-                      VALUES (?, ?, ?, ?, ?, ?, ?)''', (ano, mes, ebsco, capes, pergumum, minha_biblioteca, total_mensal))
-    conn.commit()
-
-# Carregar os dados do banco de dados SQLite
+# Função para carregar os dados do banco de dados
 def carregar_dados():
-    cursor.execute("SELECT * FROM gastos")
-    data = cursor.fetchall()
-    return data
+    conn = sqlite3.connect('contratos.db')
+    df = pd.read_sql_query("SELECT * FROM contratos", conn)
+    conn.close()
+    return df
 
-# Função para obter o ano atual
-def obter_ano_atual():
-    now = datetime.datetime.now()
-    return now.year
+# Função para criar o banco de dados SQLite e definir a tabela
+def criar_banco_dados():
+    conn = sqlite3.connect('contratos.db')
+    cursor = conn.cursor()
 
-# Criar o formulário para permitir ao usuário inserir novos dados
-st.write("### SIBI UniFTC/Unex:")
-st.write("#### Controle de Gastos:")
-st.write("##### Insira Novos Dados:")
-ano = st.number_input("Ano:", value=obter_ano_atual())
-mes = st.selectbox("Mês:", options=["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"])
-ebsco = st.number_input("EBSCO (R$):", value=0)
-capes = st.number_input("CAPES (R$):", value=0)
-pergumum = st.number_input("Pergamum (R$):", value=0)
-minha_biblioteca = st.number_input("Minha Biblioteca (R$):", value=0)
-total_mensal = ebsco + capes + pergumum + minha_biblioteca
+    # Definir o schema da tabela
+    create_table_query = '''
+    CREATE TABLE IF NOT EXISTS contratos (
+        Empresa TEXT,
+        Data_de_Vencimento TEXT,
+        Quantidade_de_Licencas INTEGER,
+        Data_de_Renovacao TEXT,
+        Valor_do_Contrato INTEGER,
+        Data_de_Pagamento TEXT,
+        Valor_Pago INTEGER,
+        Valor_a_Vencer INTEGER
+    )
+    '''
+    cursor.execute(create_table_query)
+    conn.commit()
+    conn.close()
 
-if st.button("Inserir Dados"):
-    inserir_dados(ano, mes, ebsco, capes, pergumum, minha_biblioteca, total_mensal)
-    st.success("Dados inseridos com sucesso!")
+# Função para inserir os dados na tabela
+def inserir_dados(empresa, data_vencimento, quantidade, data_renovacao, valor_contrato):
+    conn = sqlite3.connect('contratos.db')
+    cursor = conn.cursor()
 
-# Carregar os dados
-data = carregar_dados()
+    # Inserir os dados na tabela com data de pagamento como a data atual
+    data_pagamento = datetime.today().strftime("%d/%m/%Y")
+    cursor.execute('''
+        INSERT INTO contratos (Empresa, Data_de_Vencimento, Quantidade_de_Licencas, Data_de_Renovacao, Valor_do_Contrato, Data_de_Pagamento, Valor_Pago, Valor_a_Vencer)
+        VALUES (?, ?, ?, ?, ?, ?, 0, ?)
+    ''', (empresa, data_vencimento, quantidade, data_renovacao, valor_contrato, data_pagamento, valor_contrato))
 
-# Filtrar os dados de acordo com o ano selecionado
-df = pd.DataFrame(data, columns=["Ano", "Mês", "EBSCO (R$)", "CAPES (R$)", "Pergamum (R$)", "Minha Biblioteca (R$)", "Total Mensal (R$)"])
-df = df[df["Ano"] == ano]
+    conn.commit()
+    conn.close()
 
-# Exibir os dados em forma de tabela
-st.write("### Tabela de Dados:")
-st.write(df)
 
-# Reorganizando o DataFrame para usar os meses como colunas e o ano como índice
-pivot_df = df.pivot_table(index='Ano', columns='Mês', values='Total Mensal (R$)')
+# Função para atualizar o dashboard
+def atualizar_dashboard(df):
 
-# Gráfico de barras
-st.write(f"### Gastos do SIBI UniFTC - Ano {ano}:")
-bar_chart = st.bar_chart(pivot_df)
-plt.title(f"Gastos do SIBI UniFTC - Ano {ano}")
+    st.header("Tabela de Dados")
+    # Adicionar uma nova coluna para indicar se o pagamento está em atraso ou não
+    hoje = datetime.today().date()
+    df['Em Atraso'] = df.apply(lambda row: 'Sim' if pd.to_datetime(row['Data_de_Pagamento'], errors='coerce', format='%d/%m/%Y').date() < hoje and row['Valor_Pago'] == 0 else 'Não', axis=1)
+    st.write(df)
 
-# Gráfico de pizza
-st.write(f"### Total por Serviço - Ano {ano}:")
-fig, ax = plt.subplots()
-ax.pie(df.iloc[:, 2:6].sum(), labels=df.columns[2:6], autopct='%1.1f%%')
-pie_chart = st.pyplot(fig)
-plt.title(f"Total por Serviço - Ano {ano}")
+    # Gráfico 1: Evolução do Valor Pago ao Longo do Tempo (Gráfico de Linha)
+    df["Data_de_Pagamento"] = pd.to_datetime(df["Data_de_Pagamento"], errors='coerce', format='%d/%m/%Y')
+    fig1 = px.line(df, x="Data_de_Pagamento", y="Valor_Pago", title="Evolução do Valor Pago ao Longo do Tempo", 
+                   color_discrete_sequence=["#FF6347", "#32CD32", "#1E90FF"])
+    fig1.update_layout(title_font_size=22, title_font_color="#333", plot_bgcolor="#f9f9f9")
 
-# Reconfigurando o DataFrame para exibir o gráfico de linha corretamente
-df_total_mensal = df.groupby("Mês")["Total Mensal (R$)"].sum().reset_index()
+    # Gráfico 2: Valor do Contrato por Empresa (Gráfico de Barras)
+    fig2 = px.bar(df, x="Empresa", y="Valor_do_Contrato", title="Valor do Contrato por Empresa", 
+                  color="Empresa", color_discrete_sequence=["#FFA500", "#32CD32", "#1E90FF"])
+    fig2.update_layout(title_font_size=22, title_font_color="#333", plot_bgcolor="#f9f9f9")
 
-# Gráfico de linha
-st.write(f"### Total Mensal - Ano {ano}:")
-line_chart = st.line_chart(df_total_mensal.set_index("Mês"))
-plt.title(f"Total Mensal - Ano {ano}")
+    # Gráfico 3: Quantidade de Licenças por Empresa (Gráfico de Colunas)
+    fig3 = px.bar(df, x="Empresa", y="Quantidade_de_Licencas", title="Quantidade de Licenças por Empresa", 
+                  color="Empresa", barmode="group", text_auto=True, color_discrete_sequence=["#FF1493", "#FFD700", "#00CED1"])
+    fig3.update_layout(title_font_size=22, title_font_color="#333", plot_bgcolor="#f9f9f9")
 
-# Gráfico de colunas
-st.write(f"### Total Mensal por Mês - Ano {ano}:")
-bar_chart_total_mensal = st.bar_chart(df_total_mensal.set_index("Mês"))
-plt.title(f"Total Mensal por Mês - Ano {ano}")
+    # Gráfico 4: Distribuição do Valor do Contrato (Gráfico de Pizza)
+    fig4 = px.pie(df, values="Valor_do_Contrato", names="Empresa", title="Distribuição do Valor do Contrato",
+                  color_discrete_sequence=["#FF4500", "#32CD32", "#1E90FF"])
+    fig4.update_traces(textposition='inside', textinfo='percent+label')
+    fig4.update_layout(title_font_size=22, title_font_color="#333", plot_bgcolor="#f9f9f9")
 
+    # Gráfico 5: Valor a Vencer por Empresa (Gráfico de Barras Horizontais)
+    fig5 = px.bar(df, x="Valor_a_Vencer", y="Empresa", orientation='h', title="Valor a Vencer por Empresa", 
+                  color="Empresa", color_discrete_sequence=["#32CD32", "#FF4500", "#1E90FF"])
+    fig5.update_layout(title_font_size=22, title_font_color="#333", plot_bgcolor="#f9f9f9")
+
+    # Exibir gráficos em duas colunas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.plotly_chart(fig1, use_container_width=True)
+    with col2:
+        st.plotly_chart(fig2, use_container_width=True)
+
+    col3, col4 = st.columns(2)
+    with col3:
+        st.plotly_chart(fig3, use_container_width=True)
+    with col4:
+        st.plotly_chart(fig4, use_container_width=True)
+
+    st.plotly_chart(fig5, use_container_width=True)
+
+# Configurar a página
+st.set_page_config(layout="wide")
+
+# Criar ou carregar os dados do banco de dados
+criar_banco_dados()
+
+# Botões para inserir novos dados e apagar os dados de pagamento
+st.title("Dashboard de Contratos")
+
+st.title("Inserir Novo Contrato")
+
+empresas_existente = carregar_dados()['Empresa'].unique()
+empresa = st.selectbox("Empresa:", empresas_existente)
+data_vencimento = st.date_input("Data de Vencimento:")
+quantidade = st.number_input("Quantidade de Licenças:", min_value=0)
+data_renovacao = st.date_input("Data de Renovação:")
+valor_contrato = st.number_input("Valor do Contrato:", min_value=0)
+
+submit_button = st.button("Inserir")
+
+if submit_button:
+    inserir_dados(empresa, data_vencimento, quantidade, data_renovacao, valor_contrato)
+    st.success("Novo contrato inserido com sucesso.")
+    atualizar_dashboard(carregar_dados())
+
+# Botão para apagar os dados de pagamento
+st.title("Apagar Dados de Pagamento")
+apagar_button = st.button("Apagar Dados de Pagamento")
+
+if apagar_button:
+    apagar_dados_de_pagamento()
+
+# Atualizar o dashboard no início
+atualizar_dashboard(carregar_dados())
